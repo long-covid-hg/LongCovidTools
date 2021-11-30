@@ -210,8 +210,8 @@ done
 ###               ###
 #####################
 
-# extract only unique biallelic SNPs from input dataset
-$plink --bfile $INPUT --extract <(awk 'BEGIN{a["A"]++;a["C"]++;a["G"]++;a["T"]++}NR==FNR{d[$1]++;next}$2~/^rs[0-9]+$/&&(!($2 in d))&&($5 in a)&&($6 in a){print $2}' <(awk 'BEGIN{print "DUMMY"}a[$2]++{print $2}' $INPUT.bim) $INPUT.bim) --silent --make-bed --out $INPUT.filtered
+# extract only unique biallelic SNPs from input dataset, by dropping sites with multiple variants
+$plink --bfile $INPUT --extract <(awk 'BEGIN{a["A"]++;a["C"]++;a["G"]++;a["T"]++}NR==FNR{d[$1]++;next}(!($1":"$4 in d))&&($5 in a)&&($6 in a){print $2}' <(awk 'BEGIN{print "DUMMY"}a[$1":"$4]++{print $1":"$4}' $INPUT.bim) $INPUT.bim) --silent --make-bed --out $INPUT.filtered
 
 # create new .bim file to match 1KG variant weights file
 awk 'function nn(x){split(x,xx,"");str=n[xx[1]];for(i=2;i<=length(xx);i++){str=str""n[xx[i]]};return str}BEGIN{OFS="\t";n["A"]=1;n["C"]=2;n["G"]=3;n["T"]=4}{id=$1"_"$4"_"$5"_"$6}nn($6)<nn($5){id=$1"_"$4"_"$6"_"$5}{$2=id;print}' $INPUT.filtered.bim > $INPUT.filtered.CPRA.bim
@@ -226,24 +226,6 @@ fi
 
 # set max number of PCs to calculate
 maxpcs=20
-
-# run PC projection for input data (PLINK 1; defunct)
-#echo -e "\nINFO :: Projecting 1000G PCs into input data."
-#gunzip -c 1KG.eigenvec.var.gz > 1KG.eigenvec.var
-#for (( pc=1;pc<=$maxpcs;pc++ ))
-#do
-#   pccol=$((pc+4))
-#   $plink --bed $INPUT.filtered.bed --bim $INPUT.filtered.CPRA.bim --fam $INPUT.filtered.fam --silent --score 1KG.eigenvec.var $idcol 3 $pccol center --out $INPUT.filtered.PC$pc > /dev/null 2>&1
-#done
-#rm 1KG.eigenvec.var
-# combine individual PC score files
-#echo -e "INFO :: Building combined PC file."
-#awk '{print $1"\t"$2"\t"$6}' $INPUT.filtered.PC1.profile > $INPUT.eigenvec && rm $INPUT.filtered.PC1.*
-#for (( pc=2;pc<=$maxpcs;pc++ ))
-#do
-#   awk 'NR==FNR{a[$1]=$6;next}($1 in a){print $0"\t"a[$1]}' $INPUT.filtered.PC$pc.profile $INPUT.eigenvec > tmp && { mv tmp $INPUT.eigenvec; rm $INPUT.filtered.PC$pc.*; }
-#done
-#tail -n +2 $INPUT.eigenvec > tmp && mv tmp $INPUT.eigenvec
 
 # run PC projection for input data (PLINK 2)
 echo -e "\nINFO :: Projecting 1000G PCs into input data."
