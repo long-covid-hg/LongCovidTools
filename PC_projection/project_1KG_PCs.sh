@@ -224,6 +224,28 @@ else
    idcol=2
 fi
 
+# calculate number of array variants overlapping with variant weighting file and report to user
+noverlap=`awk -v vc=$idcol 'NR==FNR{a[$2]++;next}($vc in a){print $vc}' $INPUT.filtered.CPRA.bim <(zcat 1KG.eigenvec.var.gz) | wc -l`
+nproj=`zcat 1KG.eigenvec.var.gz | tail -n +2 | wc -l`
+
+if (( $(echo "$noverlap/$nproj>0.5" | bc -l) ))
+then
+   echo -e "\nINFO :: Number of input variants overlapping with PCA projection variants: $noverlap"
+elif (( $(echo "$noverlap/$nproj>0.2" | bc -l) ))
+then
+   echo -e "\nWARNING :: Less than 50% match between input genotypes and PCA projection variants."
+   echo -e "           Number of overlapping variants: $noverlap"
+elif (( $(echo "$noverlap/$nproj>0" | bc -l) ))
+then
+   echo -e "\nWARNING :: Less than 20% match between input genotypes and PCA projection variants."
+   echo -e "           PCA projection may be inaccurate."
+   echo -e "           Number of overlapping variants: $noverlap"
+else
+   echo -e "\nERROR :: No overlap between input genotypes and PCA projection variants."
+   echo -e "         Unable to perform PCA projection.\n"
+   exit 1
+fi
+
 # set max number of PCs to calculate
 maxpcs=20
 
@@ -233,14 +255,13 @@ gunzip -c 1KG.eigenvec.var.gz > 1KG.eigenvec.var
 gunzip -c 1KG.$genomebuild.afreq.gz > 1KG.afreq
 maxpccol=$((maxpcs+4))
 $plink --bed $INPUT.filtered.bed --bim $INPUT.filtered.CPRA.bim --fam $INPUT.filtered.fam --read-freq 1KG.afreq --silent --score 1KG.eigenvec.var $idcol 3 header-read no-mean-imputation variance-normalize --score-col-nums 5-$maxpccol --out $INPUT.filtered > /dev/null 2>&1
-#done
 rm 1KG.eigenvec.var 1KG.afreq
 
 # merge with 1KG PCs and assign population name "STUDY"
 maxpccol=$((maxpcs+2))
 {
-zcat 1KG.eigenvec.gz | cut -f1-$maxpccol
-cut -f1,2,5- $INPUT.filtered.sscore | awk 'BEGIN{OFS="\t"}NR>1{$1="STUDY";print}'
+   zcat 1KG.eigenvec.gz | cut -f1-$maxpccol
+   cut -f1,2,5- $INPUT.filtered.sscore | awk 'BEGIN{OFS="\t"}NR>1{$1="STUDY";print}'
 } | gzip --best > $INPUT.1KG.eigenvec.gz
 
 # plot using R
