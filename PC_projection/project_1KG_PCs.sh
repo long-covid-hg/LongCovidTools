@@ -261,7 +261,7 @@ rm 1KG.eigenvec.var 1KG.afreq
 maxpccol=$((maxpcs+2))
 {
    zcat 1KG.eigenvec.gz | cut -f1-$maxpccol
-   cut -f1,2,5- $INPUT.filtered.sscore | awk 'BEGIN{OFS="\t"}NR>1{$1="STUDY";print}'
+   awk -v mp=$maxpcs 'BEGIN{OFS="\t"}NR==1{for(i=1;i<=NF;i++){if($i~/^PC/){split($i,a,"_");split(a[1],b,"C");if(b[2]<=mp){c[i]++}}};next}{str="STUDY\t"$2;for(i=1;i<=NF;i++){if(i in c){str=str"\t"$i}};print str}' $INPUT.filtered.sscore
 } | gzip --best > $INPUT.1KG.eigenvec.gz
 
 # plot using R
